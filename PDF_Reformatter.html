@@ -1069,9 +1069,8 @@ JSON 출력:
                                 numericRate.value = parseInt(rate) || 0;
                                 plagiarismRate.value = numericRate.value + "%";
                             }
-                            // Report ID & 검사 번호
+                            // 검사 번호 (reportId는 항상 CC-랜덤8자리로 고정, 여기서 변경하지 않음)
                             const rid = metadata.reportId || textMeta.reportId || "";
-                            if (rid) reportId.value = String(rid);
                             const iNo = metadata.inspectionNo || rid;
                             if (iNo) inspectionNo.value = String(iNo);
                             // 문서 원본명 - AI 결과와 텍스트 fallback 중 더 긴(완전한) 파일명 선택
@@ -1120,8 +1119,8 @@ JSON 출력:
                                 numericRate.value = textMeta.plagiarismRate;
                                 plagiarismRate.value = textMeta.plagiarismRate + "%";
                             }
+                            // reportId는 항상 CC-랜덤8자리로 고정, 여기서 변경하지 않음
                             if (textMeta.reportId) {
-                                reportId.value = textMeta.reportId;
                                 inspectionNo.value = textMeta.reportId;
                             }
                             if (textMeta.documentTitle) {
