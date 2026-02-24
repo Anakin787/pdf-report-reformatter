@@ -8,9 +8,7 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PDF & Canvas Utils -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- PDF.js (PDF 파싱용) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <!-- Chart.js (Page 3 차트용) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1286,10 +1284,6 @@ JSON 출력:
                         const saveName = '카피클린 유사도 분석 결과 리포트 - ' + docName;
                         document.title = saveName;
 
-                        // 차트 등 렌더링 완료 대기 후 자동 다운로드
-                        await new Promise(r => setTimeout(r, 800));
-                        await autoSavePDF(saveName);
-
                     } catch (err) {
                         alert("분석 중 오류가 발생했습니다: " + err.message);
                         status.value = 'idle';
@@ -1297,41 +1291,13 @@ JSON 출력:
                 };
 
                 // ==========================================
-                // 7. PDF EXPORT
+                // 7. PDF EXPORT (브라우저 인쇄 방식)
                 // ==========================================
-                const autoSavePDF = async (fileName) => {
-                    try {
-                        const { jsPDF } = window.jspdf;
-                        const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [794, 1123], compress: true });
-                        const pageEls = document.querySelectorAll('.pdf-page');
-                        for (let i = 0; i < pageEls.length; i++) {
-                            if (i > 0) pdf.addPage([794, 1123], 'portrait');
-                            const canvas = await html2canvas(pageEls[i], {
-                                scale: 2,
-                                useCORS: true,
-                                allowTaint: true,
-                                backgroundColor: '#ffffff',
-                                width: 794,
-                                height: 1123,
-                                windowWidth: 794,
-                                scrollX: 0,
-                                scrollY: -pageEls[i].getBoundingClientRect().top + window.scrollY
-                            });
-                            const imgData = canvas.toDataURL('image/jpeg', 0.92);
-                            pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123);
-                        }
-                        pdf.save((fileName || 'report') + '.pdf');
-                    } catch (e) {
-                        console.error('[CopyClean] PDF 저장 오류:', e);
-                        // fallback: 브라우저 인쇄
-                        window.print();
-                    }
-                };
 
                 const downloadPDF = () => {
                     const docName = (originalDocName.value || 'report').replace(/\.(pdf|hwpx?|docx?|pptx?|xlsx?|txt)$/i, '');
-                    const saveName = '카피클린 유사도 분석 결과 리포트 - ' + docName;
-                    autoSavePDF(saveName);
+                    document.title = '카피클린 유사도 분석 결과 리포트 - ' + docName;
+                    window.print();
                 };
 
                 const reset = () => {
