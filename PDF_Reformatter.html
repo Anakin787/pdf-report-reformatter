@@ -1201,7 +1201,24 @@ JSON 출력:
                         const FOOTER_H = 30;
                         const FIRST_HEADER_H = 60;
                         const SUB_HEADER_H = 35;
-                        const CARD_H = 240; // 카드 실제 높이 (border+margin 포함)
+                        const MIN_CARD_H = 240; // 카드 최소 높이
+                        const CARD_MARGIN = 18; // comp-card margin-bottom
+                        const CARD_HDR_H = 32; // 헤더 높이
+                        const CARD_FOOT_H = 24; // 푸터 높이
+                        const CARD_BODY_PAD = 20; // body 상하 패딩
+                        const LINE_H_LEFT = 11 * 1.7; // body-l: font 11px, line-height 1.7
+                        const CHARS_PER_LINE = 28; // body-l 한 줄 약 28자 (flex:1, padding 포함)
+
+                        // 카드 텍스트 기반 높이 추정
+                        const estimateCardH = (comp) => {
+                            const leftText = comp.originalText || '';
+                            const rightText = (comp.source?.matchedText || '') + (comp.source?.fullReference || '');
+                            const leftLines = Math.max(1, Math.ceil(leftText.length / CHARS_PER_LINE));
+                            const rightLines = Math.max(1, Math.ceil(rightText.length / CHARS_PER_LINE));
+                            const maxLines = Math.max(leftLines, rightLines);
+                            const bodyH = maxLines * LINE_H_LEFT + CARD_BODY_PAD;
+                            return Math.max(MIN_CARD_H, Math.ceil(CARD_HDR_H + bodyH + CARD_FOOT_H + CARD_MARGIN));
+                        };
 
                         const newPages = [];
                         let currentComps = [];
@@ -1211,22 +1228,23 @@ JSON 출력:
                         for (let i = 0; i < allComparisons.length; i++) {
                             const headerH = isFirstPage ? FIRST_HEADER_H : SUB_HEADER_H;
                             const availableH = PAGE_HEIGHT - PADDING_V - FOOTER_H - headerH;
+                            const cardH = estimateCardH(allComparisons[i]);
 
-                            if (usedHeight + CARD_H > availableH && currentComps.length > 0) {
+                            if (usedHeight + cardH > availableH && currentComps.length > 0) {
                                 newPages.push({ comparisons: [...currentComps] });
                                 currentComps = [];
                                 usedHeight = 0;
                                 isFirstPage = false;
                             }
                             currentComps.push(allComparisons[i]);
-                            usedHeight += CARD_H;
+                            usedHeight += cardH;
                         }
                         if (currentComps.length > 0) {
                             newPages.push({ comparisons: currentComps });
                         }
 
                         contentPages.value = newPages;
-                        console.log("[CopyClean] 동적 페이지 배치 완료 -", newPages.length, "페이지, 카드당 높이:", CARD_H);
+                        console.log("[CopyClean] 동적 페이지 배치 완료 -", newPages.length, "페이지, 총 카드:", allComparisons.length);
 
                         // 문서명 (페이지1용 - 확장자 없이)
                         if (!docTitle.value) docTitle.value = file.name;
