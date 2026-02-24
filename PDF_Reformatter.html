@@ -1282,7 +1282,7 @@ JSON 출력:
                         renderChart();
 
                         // 파일명을 document.title에 설정 (브라우저 인쇄 시 PDF 파일명으로 사용)
-                        const docName = originalDocName.value || file.name.replace(/\.pdf$/i, '');
+                        const docName = (originalDocName.value || file.name).replace(/\.(pdf|hwpx?|docx?|pptx?|xlsx?|txt)$/i, '');
                         const saveName = '카피클린 유사도 분석 결과 리포트 - ' + docName;
                         document.title = saveName;
 
@@ -1329,7 +1329,7 @@ JSON 출력:
                 };
 
                 const downloadPDF = () => {
-                    const docName = originalDocName.value || 'report';
+                    const docName = (originalDocName.value || 'report').replace(/\.(pdf|hwpx?|docx?|pptx?|xlsx?|txt)$/i, '');
                     const saveName = '카피클린 유사도 분석 결과 리포트 - ' + docName;
                     autoSavePDF(saveName);
                 };
