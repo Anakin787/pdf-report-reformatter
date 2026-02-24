@@ -152,10 +152,16 @@
                     <span v-if="fileQueue.length > 0" class="text-xs text-slate-400">({{ currentFileIndex + 1 }} / {{ totalFiles }})</span>
                 </div>
 
-                <div v-else class="flex gap-2">
+                <div v-else class="flex gap-2 items-center">
                     <button @click="reset" class="px-4 py-2 text-sm text-slate-400 hover:text-white font-bold">초기화</button>
-                    <button @click="downloadPDF" :disabled="isExporting" class="bg-emerald-500 hover:bg-emerald-400 px-6 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg transition-all">
-                        {{ isExporting ? 'PDF 생성 중...' : '📥 전체 리포트 다운로드' }}
+                    <template v-if="waitingForDownload">
+                        <span class="text-xs text-slate-400 font-bold">({{ currentFileIndex + 1 }} / {{ totalFiles }})</span>
+                        <button @click="downloadAndNext" class="bg-blue-500 hover:bg-blue-400 px-6 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg transition-all">
+                            📥 다운로드 & 다음 파일 →
+                        </button>
+                    </template>
+                    <button v-else @click="downloadPDF" class="bg-emerald-500 hover:bg-emerald-400 px-6 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg transition-all">
+                        📥 리포트 다운로드
                     </button>
                 </div>
             </div>
@@ -593,6 +599,8 @@
                 const fileQueue = ref([]); // [{ file, price }]
                 const currentFileIndex = ref(0);
                 const totalFiles = ref(0);
+                const waitingForDownload = ref(false);
+                let resolveDownloadWait = null;
 
                 // PDF.js Worker 설정 (즉시 실행)
                 if (window.pdfjsLib) {
@@ -959,6 +967,12 @@ JSON 출력:
                         const { file, price } = fileQueue.value[i];
                         servicePrice.value = price;
                         await processFile(file);
+                        // 마지막 파일이 아니면 다운로드 대기 (사용자가 버튼 클릭 시 다음 파일 진행)
+                        if (i < fileQueue.value.length - 1) {
+                            waitingForDownload.value = true;
+                            await new Promise(resolve => { resolveDownloadWait = resolve; });
+                            waitingForDownload.value = false;
+                        }
                     }
                     fileQueue.value = [];
                     totalFiles.value = 0;
@@ -1299,6 +1313,14 @@ JSON 출력:
                     window.print();
                 };
 
+                const downloadAndNext = () => {
+                    downloadPDF();
+                    if (resolveDownloadWait) {
+                        resolveDownloadWait();
+                        resolveDownloadWait = null;
+                    }
+                };
+
                 const reset = () => {
                     status.value = 'idle';
                     pages.value = [];
@@ -1326,6 +1348,8 @@ JSON 출력:
                     fileQueue.value = [];
                     currentFileIndex.value = 0;
                     totalFiles.value = 0;
+                    waitingForDownload.value = false;
+                    resolveDownloadWait = null;
                     document.title = "CopyClean Expert Report System";
                 };
 
@@ -1339,8 +1363,8 @@ JSON 출력:
                     totalSentences, aiSimilarSentences, identicalSentences, suspiciousSentences, citationCount,
                     categoryRatios, generatedTimestamp, distributionBar,
                     formattedPrice, formattedPricingBase, getVerdictText, getVerdictClass, getVerdictIcon, getVerdictDesc,
-                    handleFileUpload, handleDrop, isDragging, downloadPDF, reset,
-                    fileQueue, currentFileIndex, totalFiles, startQueue
+                    handleFileUpload, handleDrop, isDragging, downloadPDF, downloadAndNext, reset,
+                    fileQueue, currentFileIndex, totalFiles, startQueue, waitingForDownload
                 };
             }
         }).mount('#app');
