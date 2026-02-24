@@ -1001,8 +1001,7 @@ JSON 출력:
                         const pdf = await loadingTask.promise;
                         console.log("[CopyClean] PDF 파싱 완료, 총 페이지:", pdf.numPages);
                         
-                        // [수정] 10페이지 제한 설정
-                        const maxPages = Math.min(pdf.numPages, 15);
+                        const maxPages = Math.min(pdf.numPages, 10);
                         
                         let fullTextForRate = "";
                         const summaryPageImages = []; // 1-2페이지 이미지 저장 (메타데이터 추출용)
@@ -1212,7 +1211,7 @@ JSON 출력:
                         const FOOTER_H = 30;
                         const FIRST_HEADER_H = 60;
                         const SUB_HEADER_H = 35;
-                        const MIN_CARD_H = 240; // 카드 최소 높이
+                        const MIN_CARD_H = 200; // 카드 최소 높이
                         const CARD_MARGIN = 18; // comp-card margin-bottom
                         const CARD_HDR_H = 32; // 헤더 높이
                         const CARD_FOOT_H = 24; // 푸터 높이
