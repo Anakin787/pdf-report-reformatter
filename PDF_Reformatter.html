@@ -816,7 +816,9 @@ ${fullText.substring(0, 3000)}
                         const data = await response.json();
                         console.log("[CopyClean] API 응답 상태:", response.status, "데이터:", JSON.stringify(data).substring(0, 500));
                         if (data.error) throw new Error(data.error.message);
-                        const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
+                        let parsed = JSON.parse(data.candidates[0].content.parts[0].text);
+                        // API가 배열로 반환하는 경우 첫 번째 요소 사용
+                        if (Array.isArray(parsed)) parsed = parsed[0];
                         console.log("[CopyClean] 파싱된 메타데이터:", JSON.stringify(parsed, null, 2));
                         return parsed;
                     } catch (e) {
@@ -917,7 +919,9 @@ JSON 출력:
 
                         const data = await response.json();
                         if (data.error) throw new Error(data.error.message);
-                        return JSON.parse(data.candidates[0].content.parts[0].text);
+                        let parsed = JSON.parse(data.candidates[0].content.parts[0].text);
+                        if (Array.isArray(parsed)) parsed = parsed[0];
+                        return parsed;
                     } catch (e) {
                         console.error("[CopyClean] 정밀 분석 API Error:", e);
                         return { comparisons: [] };
