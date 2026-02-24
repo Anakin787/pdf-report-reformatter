@@ -1001,7 +1001,7 @@ JSON 출력:
                         const pdf = await loadingTask.promise;
                         console.log("[CopyClean] PDF 파싱 완료, 총 페이지:", pdf.numPages);
                         
-                        const maxPages = Math.min(pdf.numPages, 10);
+                        const maxPages = pdf.numPages;
                         
                         let fullTextForRate = "";
                         const summaryPageImages = []; // 1-2페이지 이미지 저장 (메타데이터 추출용)
