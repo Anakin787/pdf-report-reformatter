@@ -265,7 +265,7 @@
                                 <h4 class="text-xs font-bold text-slate-500 mb-3">&gt; 종합 진단 판정 기준</h4>
                                 <div class="flex justify-between gap-2 text-center text-[10px] font-bold">
                                     <div class="bg-white border border-slate-200 flex-1 py-2 rounded"><span class="text-green-600">안전</span><br>15% 이하</div>
-                                    <div class="bg-white border border-slate-200 flex-1 py-2 rounded"><span class="text-orange-500">고위험</span><br>15 ~ 30%</div>
+                                    <div class="bg-white border border-slate-200 flex-1 py-2 rounded"><span class="text-orange-500">고위험</span><br>16 ~ 30%</div>
                                     <div class="bg-white border border-slate-200 flex-1 py-2 rounded"><span class="text-red-500">부적합</span><br>30% 초과</div>
                                 </div>
                             </div>
@@ -648,7 +648,7 @@
                                     c.font = 'bold 10px Noto Sans KR';
                                     const textW = c.measureText(chipText).width;
                                     const labelW = textW + 16, labelH = 20;
-                                    const lx = xPos - labelW / 2, ly = yPos - 52;
+                                    const lx = xPos - labelW / 2, ly = Math.max(4, yPos - 52);
                                     c.fillStyle = chipColor;
                                     c.beginPath();
                                     c.roundRect(lx, ly, labelW, labelH, 4);
@@ -658,7 +658,7 @@
                                     // 퍼센트: 칩 아래, 바 바로 위
                                     c.font = 'bold 14px Noto Sans KR';
                                     c.fillStyle = rateColor;
-                                    c.fillText(value + '%', xPos, yPos - 8);
+                                    c.fillText(value + '%', xPos, Math.max(ly + labelH + 16, yPos - 8));
                                 } else {
                                     c.fillText(value + '%', xPos, yPos - 12);
                                 }
@@ -685,7 +685,7 @@
                             maintainAspectRatio: false,
                             plugins: { legend: { display: false } },
                             scales: {
-                                y: { beginAtZero: true, max: Math.ceil((Math.max(numericRate.value, 15) + 15) / 10) * 10, ticks: { stepSize: 10, color: '#cbd5e1' }, grid: { borderDash: [5, 5], color: 'rgba(226,232,240,0.5)' }, border: { color: 'rgba(226,232,240,0.5)' } },
+                                y: { beginAtZero: true, max: Math.ceil((Math.max(numericRate.value, 15) + 25) / 10) * 10, ticks: { stepSize: 10, color: '#cbd5e1' }, grid: { borderDash: [5, 5], color: 'rgba(226,232,240,0.5)' }, border: { color: 'rgba(226,232,240,0.5)' } },
                                 x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
                             }
                         }
@@ -778,7 +778,7 @@ ${fullText.substring(0, 3000)}
 {
   "reportId": "검사번호 (표에서 '검사번호' 행의 값을 그대로. 숫자만 있어도 그대로 적기)",
   "inspectionNo": "검사 일련번호 (reportId와 같을 수 있음)",
-  "documentTitle": "문서 제목 또는 파일명 (확장자 포함, 예: 후기청소년.hwpx)",
+  "documentTitle": "문서 제목 또는 파일명 전체 (공백 포함, 확장자 포함, 예: 프로포절 발표문.pdf, 후기청소년 과제.hwpx). 절대로 파일명을 자르거나 축약하지 마세요.",
   "plagiarismRate": "표절률 숫자만 (% 제외). 반드시 이미지에서 표절률/유사율/복제율 숫자를 찾을 것",
   "totalSentences": 0,
   "aiSimilarSentences": 0,
@@ -792,7 +792,7 @@ ${fullText.substring(0, 3000)}
 절대 규칙:
 1. 이미지에서 보이는 값을 그대로 읽으세요. 추측 금지.
 2. "표절률"은 반드시 찾아야 합니다. 큰 글씨, 원형차트, 또는 표 안에 있습니다.
-3. "검사번호"와 "문서제목/파일명"도 반드시 표에서 찾으세요.
+3. "검사번호"와 "문서제목/파일명"도 반드시 표에서 찾으세요. 파일명은 공백을 포함할 수 있으므로 확장자(.hwp, .hwpx, .docx, .pdf 등)까지 전체를 빠짐없이 읽으세요. 예: "프로포절 발표문.pdf"를 "발표문.pdf"로 자르면 안 됩니다.
 4. 숫자 필드는 숫자 타입으로 (문자열 아님)
 5. 못 찾은 문자열 필드는 빈 문자열("")로
 6. categoryRatios는 카피킬러 결과에서 "출처별 표절률" 또는 카테고리별 비율을 찾으세요. 보통 "학술논문", "공공기관/기업", "웹/커뮤니티", "도서/출판" 등으로 나뉩니다. 찾을 수 없으면 빈 배열([])로 응답하세요.
@@ -1026,8 +1026,12 @@ JSON 출력:
                             // 검사번호
                             const idMatch = text.match(/검사\s*번호\s*[:]?\s*([A-Za-z0-9\-]+)/);
                             if (idMatch) result.reportId = idMatch[1];
-                            // 문서제목/파일명 (.hwp, .hwpx, .docx, .pdf, .txt 등)
-                            const fileMatch = text.match(/([^\s/\\]{2,}\.(hwpx?|docx?|pdf|txt|pptx?|xlsx?))/i);
+                            // 문서제목/파일명 (.hwp, .hwpx, .docx, .pdf, .txt 등) - 공백 포함 파일명 지원
+                            // "문서제목" 또는 "파일명" 라벨 뒤의 값을 우선 매칭
+                            const labeledFileMatch = text.match(/(?:문서\s*제목|파일\s*명)\s*[:]?\s*(.+?\.(hwpx?|docx?|pdf|txt|pptx?|xlsx?))/i);
+                            const fileMatch = labeledFileMatch
+                                ? [null, labeledFileMatch[1].trim()]
+                                : text.match(/([^\n/\\]{2,}\.(hwpx?|docx?|pdf|txt|pptx?|xlsx?))/i);
                             if (fileMatch) result.documentTitle = fileMatch[1];
                             // 검사일
                             const dateMatch = text.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
@@ -1055,9 +1059,17 @@ JSON 출력:
                             if (rid) reportId.value = String(rid);
                             const iNo = metadata.inspectionNo || rid;
                             if (iNo) inspectionNo.value = String(iNo);
-                            // 문서 원본명
-                            const dTitle = metadata.documentTitle || textMeta.documentTitle || "";
-                            if (dTitle) originalDocName.value = String(dTitle);
+                            // 문서 원본명 - AI 결과와 텍스트 fallback 중 더 긴(완전한) 파일명 선택
+                            const aiTitle = metadata.documentTitle ? String(metadata.documentTitle).trim() : "";
+                            const txtTitle = textMeta.documentTitle ? String(textMeta.documentTitle).trim() : "";
+                            // 둘 다 있으면 더 긴 쪽 선택 (잘린 파일명 방지)
+                            let dTitle = "";
+                            if (aiTitle && txtTitle) {
+                                dTitle = aiTitle.length >= txtTitle.length ? aiTitle : txtTitle;
+                            } else {
+                                dTitle = aiTitle || txtTitle;
+                            }
+                            if (dTitle) originalDocName.value = dTitle;
                             else originalDocName.value = file.name;
                             // docTitle (Page 3용)도 같이 설정
                             if (dTitle) docTitle.value = String(dTitle);
@@ -1220,12 +1232,13 @@ JSON 출력:
                         renderChart();
 
                         // 파일명을 document.title에 설정 (브라우저 인쇄 시 PDF 파일명으로 사용)
-                        const baseName = file.name.replace(/\.pdf$/i, '');
-                        document.title = baseName;
+                        const docName = originalDocName.value || file.name.replace(/\.pdf$/i, '');
+                        const saveName = '카피클린 유사도 분석 결과 리포트 - ' + docName;
+                        document.title = saveName;
 
                         // 차트 등 렌더링 완료 대기 후 자동 다운로드
                         await new Promise(r => setTimeout(r, 800));
-                        await autoSavePDF(baseName);
+                        await autoSavePDF(saveName);
 
                     } catch (err) {
                         alert("분석 중 오류가 발생했습니다: " + err.message);
@@ -1266,8 +1279,9 @@ JSON 출력:
                 };
 
                 const downloadPDF = () => {
-                    const baseName = document.title || 'report';
-                    autoSavePDF(baseName);
+                    const docName = originalDocName.value || 'report';
+                    const saveName = '카피클린 유사도 분석 결과 리포트 - ' + docName;
+                    autoSavePDF(saveName);
                 };
 
                 const reset = () => {
