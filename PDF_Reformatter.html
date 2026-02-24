@@ -1027,11 +1027,11 @@ JSON 출력:
                             const idMatch = text.match(/검사\s*번호\s*[:]?\s*([A-Za-z0-9\-]+)/);
                             if (idMatch) result.reportId = idMatch[1];
                             // 문서제목/파일명 (.hwp, .hwpx, .docx, .pdf, .txt 등) - 공백 포함 파일명 지원
-                            // "문서제목" 또는 "파일명" 라벨 뒤의 값을 우선 매칭
-                            const labeledFileMatch = text.match(/(?:문서\s*제목|파일\s*명)\s*[:]?\s*(.+?\.(hwpx?|docx?|pdf|txt|pptx?|xlsx?))/i);
+                            // "문서명" / "문서제목" / "파일명" 라벨 직후 파일명만 캡처 (한글/영문/숫자/공백/특수문자 + 확장자)
+                            const labeledFileMatch = text.match(/(?:문서\s*명|문서\s*제목|파일\s*명)\s*[:]?\s*([\w가-힣\s\-_.()]{1,80}\.(hwpx?|docx?|pdf|txt|pptx?|xlsx?))/i);
                             const fileMatch = labeledFileMatch
                                 ? [null, labeledFileMatch[1].trim()]
-                                : text.match(/([^\n/\\]{2,}\.(hwpx?|docx?|pdf|txt|pptx?|xlsx?))/i);
+                                : text.match(/([\w가-힣\s\-_.()]{2,80}\.(hwpx?|docx?|pdf|txt|pptx?|xlsx?))/i);
                             if (fileMatch) result.documentTitle = fileMatch[1];
                             // 검사일
                             const dateMatch = text.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
