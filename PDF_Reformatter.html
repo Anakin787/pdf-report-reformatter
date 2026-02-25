@@ -907,7 +907,30 @@ JSON 출력:
 3. "카피킬러"를 "카피클린"으로, "CopyKiller"를 "CopyClean"으로 대체
 4. 한 페이지에 여러 비교 항목이 있을 수 있습니다
 5. "비교문서정보" 표(검사문서/비교문서 열이 있는 메타정보 테이블)는 비교 항목이 절대 아닙니다. 이 표는 문서제목, 파일형식, 등록일, 문서종류, URL 등 여러 행으로 구성되며, 표의 테두리가 끝날 때까지 전부 하나의 표입니다. 이 표 전체를 무시하세요. 이 표 안의 URL, 문서제목, 저자, 발행처, 파일형식 등 어떤 정보도 comparisons에 포함하지 마세요. 비교문서정보 표의 URL을 source.url로 사용하는 것도 절대 금지입니다.
-6. 반드시 JSON만 응답하세요`;
+6. 반드시 JSON만 응답하세요
+
+⚠️ 분석 품질 필수 지침 (반드시 준수):
+
+[유사도 0% 방지]
+- 좌측에 "표절 의심 문장" 또는 "AI 유사도 의심 문장"이 존재하는 비교 카드에서 similarity가 0%인 것은 데이터 추출 오류입니다.
+- 비교 카드가 존재한다는 것은 반드시 0%보다 높은 유사도가 있다는 의미입니다. 이미지에서 유사도 수치(배지, 퍼센트 표시)를 다시 한번 정밀하게 확인하세요.
+- 특히 ai_similarity 타입의 경우, 문장이 하이라이트 되어 있다면 우측 분석 근거를 참고하여 실제 유사도 수치를 반드시 추출하세요. 근거 없이 0%로 기재하는 것은 절대 금지합니다.
+- 만약 유사도 배지가 이미지에서 잘 보이지 않더라도, 비교 카드가 존재하는 이상 최소한 카드에 표시된 수치를 최대한 읽어내세요.
+
+[전 구간 일관성 — 페이지 내 상단/하단 동일 강도 추출]
+- 이미지의 상단에 있는 비교 카드든, 중간이든, 하단(페이지 끝부분)에 있는 비교 카드든 동일한 정밀도와 강도로 모든 데이터를 추출하세요.
+- 페이지 하단부의 비교 카드에서 highlightedText, similarity, matchedText 등이 누락되는 경우가 빈번합니다. 하단 카드를 절대 건너뛰거나 대충 처리하지 마세요.
+- 이미지에 보이는 모든 비교 카드를 빠짐없이 전수 조사하세요. 카드 수가 3개면 3개, 5개면 5개 전부 추출해야 합니다.
+
+[하이라이트/밑줄 정밀 추출]
+- originalText에서 빨간색, 노란색, 파란색 등으로 강조(하이라이트/밑줄/색상 표시)된 텍스트를 highlightedText에 정확히 분리하여 기재하세요.
+- 강조 표시가 문장의 일부분만 되어 있다면, 강조된 부분만 정확하게 추출하세요. 전체 문장을 highlightedText에 넣지 마세요.
+- 하이라이트 색상이 실제 similarity 수치와 논리적으로 일치하는지 최종 검증하세요 (빨간색=높은 유사도, 노란색=중간 유사도 등).
+
+[AI 유사도 패턴 구체화]
+- ai_similarity 타입의 경우, source.patternType에 해당 문장이 왜 AI 생성물로 의심되는지 구체적으로 기재하세요.
+- 예시: "일관된 문체 패턴", "특정 접속사 반복 사용", "정형화된 문장 구조", "학술적 어휘 과다 사용" 등
+- "AI 패턴"이라고만 적는 것은 불충분합니다. 반드시 구체적인 근거를 기술하세요.`;
 
                         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
                             method: 'POST',
@@ -927,6 +950,27 @@ JSON 출력:
                         if (data.error) throw new Error(data.error.message);
                         let parsed = JSON.parse(data.candidates[0].content.parts[0].text);
                         if (Array.isArray(parsed)) parsed = parsed[0];
+
+                        // === 후처리: 0% 유사도 보정 및 데이터 무결성 검증 ===
+                        if (parsed.comparisons && parsed.comparisons.length > 0) {
+                            parsed.comparisons = parsed.comparisons.map(comp => {
+                                // 비교 카드가 존재하는데 similarity가 0이면 데이터 추출 오류로 간주
+                                if (comp.similarity === 0 && (comp.originalText || comp.highlightedText)) {
+                                    console.warn(`[CopyClean] 페이지 ${pageNum}: 비교 카드에 유사도 0% 감지 — 보정 필요`, comp.originalText?.substring(0, 50));
+                                    // highlightedText가 있으면 최소 유사도 부여 (추출 오류 보정)
+                                    if (comp.highlightedText && comp.highlightedText.trim().length > 0) {
+                                        comp.similarity = 1; // 최소값으로 보정 (0%가 아님을 표시)
+                                        comp._corrected = true;
+                                    }
+                                }
+                                // highlightedText 누락 보정: originalText는 있는데 highlightedText가 비어있으면 경고
+                                if (comp.originalText && (!comp.highlightedText || comp.highlightedText.trim().length === 0)) {
+                                    console.warn(`[CopyClean] 페이지 ${pageNum}: highlightedText 누락 감지`, comp.originalText?.substring(0, 50));
+                                }
+                                return comp;
+                            });
+                        }
+
                         return parsed;
                     } catch (e) {
                         console.error("[CopyClean] 정밀 분석 API Error:", e);
