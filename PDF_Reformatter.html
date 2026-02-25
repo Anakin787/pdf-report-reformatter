@@ -922,9 +922,12 @@ JSON 출력:
 - 페이지 하단부의 비교 카드에서 highlightedText, similarity, matchedText 등이 누락되는 경우가 빈번합니다. 하단 카드를 절대 건너뛰거나 대충 처리하지 마세요.
 - 이미지에 보이는 모든 비교 카드를 빠짐없이 전수 조사하세요. 카드 수가 3개면 3개, 5개면 5개 전부 추출해야 합니다.
 
-[하이라이트/밑줄 정밀 추출]
+[하이라이트/밑줄 정밀 추출 — 가장 중요한 규칙]
 - originalText에서 빨간색, 노란색, 파란색 등으로 강조(하이라이트/밑줄/색상 표시)된 텍스트를 highlightedText에 정확히 분리하여 기재하세요.
-- 강조 표시가 문장의 일부분만 되어 있다면, 강조된 부분만 정확하게 추출하세요. 전체 문장을 highlightedText에 넣지 마세요.
+- 강조 표시가 문장의 일부분만 되어 있다면, 강조된 부분만 정확하게 추출하세요.
+- ⚠️ 유사도가 높을수록(특히 80~100%) 강조/밑줄 범위가 넓습니다. 100% 유사도인 경우 원문 전체가 강조 대상이므로 highlightedText에 originalText 전체를 그대로 넣으세요.
+- ⚠️ highlightedText는 반드시 originalText의 정확한 부분 문자열(substring)이어야 합니다. 단어를 바꾸거나, 공백을 추가/제거하거나, 순서를 변경하지 마세요. 이미지에서 보이는 강조 부분을 originalText에서 그대로 복사하세요.
+- highlightedText가 빈 문자열("")이면 밑줄이 전혀 표시되지 않습니다. 비교 카드에 강조 표시가 하나라도 있다면 반드시 채워야 합니다.
 - 하이라이트 색상이 실제 similarity 수치와 논리적으로 일치하는지 최종 검증하세요 (빨간색=높은 유사도, 노란색=중간 유사도 등).
 
 [AI 유사도 패턴 구체화]
@@ -963,9 +966,16 @@ JSON 출력:
                                         comp._corrected = true;
                                     }
                                 }
-                                // highlightedText 누락 보정: originalText는 있는데 highlightedText가 비어있으면 경고
+                                // highlightedText 누락 보정: originalText는 있는데 highlightedText가 비어있으면
                                 if (comp.originalText && (!comp.highlightedText || comp.highlightedText.trim().length === 0)) {
-                                    console.warn(`[CopyClean] 페이지 ${pageNum}: highlightedText 누락 감지`, comp.originalText?.substring(0, 50));
+                                    if (comp.similarity >= 80) {
+                                        // 유사도 80% 이상이면 원문 전체가 강조 대상 → 자동 채움
+                                        comp.highlightedText = comp.originalText;
+                                        comp._hlCorrected = true;
+                                        console.warn(`[CopyClean] 페이지 ${pageNum}: 유사도 ${comp.similarity}%인데 highlightedText 누락 → 원문 전체로 자동 보정`);
+                                    } else {
+                                        console.warn(`[CopyClean] 페이지 ${pageNum}: highlightedText 누락 감지 (유사도 ${comp.similarity}%)`, comp.originalText?.substring(0, 50));
+                                    }
                                 }
                                 return comp;
                             });
@@ -1233,13 +1243,48 @@ JSON 출력:
                                         if (!comp.caseRef) comp.caseRef = `CC-${++caseCounter}`;
                                         // 강조 텍스트 포맷팅 (hl 클래스는 card-plag/card-ai 부모에 의해 색상 결정)
                                         if (comp.highlightedText && comp.originalText) {
-                                            if (comp.originalText.includes(comp.highlightedText)) {
-                                                comp.formattedOriginal = comp.originalText.replace(
-                                                    comp.highlightedText,
-                                                    `<span class="hl">${comp.highlightedText}</span>`
+                                            const hl = comp.highlightedText.trim();
+                                            const orig = comp.originalText;
+                                            if (orig.includes(hl)) {
+                                                // 정확한 부분 문자열 매칭
+                                                comp.formattedOriginal = orig.replace(
+                                                    hl,
+                                                    `<span class="hl">${hl}</span>`
                                                 );
                                             } else {
-                                                comp.formattedOriginal = comp.originalText;
+                                                // 공백 정규화 후 재시도
+                                                const normOrig = orig.replace(/\s+/g, ' ');
+                                                const normHl = hl.replace(/\s+/g, ' ');
+                                                if (normOrig.includes(normHl)) {
+                                                    // 정규화된 매칭 — 원본에서 위치를 찾아 밑줄 적용
+                                                    const idx = normOrig.indexOf(normHl);
+                                                    // 원본 텍스트에서 동일 범위를 추출하여 적용
+                                                    let origIdx = 0, normIdx = 0;
+                                                    let startOrig = -1, endOrig = -1;
+                                                    while (origIdx < orig.length && normIdx < normOrig.length) {
+                                                        if (normIdx === idx && startOrig === -1) startOrig = origIdx;
+                                                        if (normIdx === idx + normHl.length) { endOrig = origIdx; break; }
+                                                        if (/\s/.test(orig[origIdx]) && (origIdx + 1 < orig.length && /\s/.test(orig[origIdx + 1]))) {
+                                                            origIdx++; continue;
+                                                        }
+                                                        origIdx++; normIdx++;
+                                                    }
+                                                    if (endOrig === -1) endOrig = orig.length;
+                                                    if (startOrig >= 0) {
+                                                        const matchedPart = orig.substring(startOrig, endOrig);
+                                                        comp.formattedOriginal = orig.substring(0, startOrig) +
+                                                            `<span class="hl">${matchedPart}</span>` +
+                                                            orig.substring(endOrig);
+                                                    } else {
+                                                        comp.formattedOriginal = `<span class="hl">${orig}</span>`;
+                                                    }
+                                                } else if (comp.similarity >= 80) {
+                                                    // 유사도 80% 이상인데 매칭 실패 → 전체 밑줄 처리
+                                                    comp.formattedOriginal = `<span class="hl">${orig}</span>`;
+                                                } else {
+                                                    comp.formattedOriginal = orig;
+                                                    console.warn(`[CopyClean] highlightedText 매칭 실패:`, hl.substring(0, 50), '← not in →', orig.substring(0, 50));
+                                                }
                                             }
                                         }
                                     });
