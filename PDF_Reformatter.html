@@ -1314,6 +1314,25 @@ JSON 출력:
                                 console.error(`[CopyClean] 정밀 분석 ${i}페이지 처리 오류 (건너뜀):`, pageErr);
                             }
                         }
+                        // === 중복 비교 카드 제거 ===
+                        if (allComparisons.length > 0) {
+                            const beforeDedup = allComparisons.length;
+                            const seen = new Set();
+                            const deduped = [];
+                            for (const comp of allComparisons) {
+                                // originalText 앞 80자 + similarity + pageNum 조합으로 중복 판별
+                                const key = `${(comp.originalText || '').trim().substring(0, 80)}|${comp.similarity}|${comp.pageNum}`;
+                                if (!seen.has(key)) {
+                                    seen.add(key);
+                                    deduped.push(comp);
+                                }
+                            }
+                            if (beforeDedup !== deduped.length) {
+                                console.log(`[CopyClean] 중복 카드 ${beforeDedup - deduped.length}개 제거됨 (${beforeDedup} → ${deduped.length})`);
+                            }
+                            allComparisons.length = 0;
+                            allComparisons.push(...deduped);
+                        }
                         // 높이 기반 페이지 분배
                         const PAGE_HEIGHT = 1123;
                         const PADDING_V = 28 * 2;
