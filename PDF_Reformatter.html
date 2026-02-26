@@ -908,6 +908,7 @@ JSON 출력:
 4. 한 페이지에 여러 비교 항목이 있을 수 있습니다
 5. "비교문서정보" 표(검사문서/비교문서 열이 있는 메타정보 테이블)는 비교 항목이 절대 아닙니다. 이 표는 문서제목, 파일형식, 등록일, 문서종류, URL 등 여러 행으로 구성되며, 표의 테두리가 끝날 때까지 전부 하나의 표입니다. 이 표 전체를 무시하세요. 이 표 안의 URL, 문서제목, 저자, 발행처, 파일형식 등 어떤 정보도 comparisons에 포함하지 마세요. 비교문서정보 표의 URL을 source.url로 사용하는 것도 절대 금지입니다.
 6. 반드시 JSON만 응답하세요
+7. ⚠️ 무의미한 비교 카드 제외: 원문(좌측)의 텍스트가 숫자만 있거나(예: "27", "28"), 의미 있는 문장이 아닌 경우(단순 번호, 목차 번호, 페이지 번호 등) 해당 비교 카드는 comparisons에 포함하지 마세요. 또한 비교문서정보 표의 내용(저자명, URL, 발행처, 파일형식 등 서지 메타데이터)이 비교 카드 형태로 나타나더라도, 원문 측에 실질적인 문장 내용이 없으면 제외하세요.
 
 ⚠️ 분석 품질 필수 지침 (반드시 준수):
 
@@ -954,8 +955,27 @@ JSON 출력:
                         let parsed = JSON.parse(data.candidates[0].content.parts[0].text);
                         if (Array.isArray(parsed)) parsed = parsed[0];
 
-                        // === 후처리: 0% 유사도 보정 및 데이터 무결성 검증 ===
+                        // === 후처리: 무의미한 카드 필터 + 0% 유사도 보정 + 데이터 무결성 검증 ===
                         if (parsed.comparisons && parsed.comparisons.length > 0) {
+                            // 원문이 숫자뿐이거나 실질적 내용이 없는 카드 제거
+                            const beforeCount = parsed.comparisons.length;
+                            parsed.comparisons = parsed.comparisons.filter(comp => {
+                                const text = (comp.originalText || '').trim();
+                                // 숫자만 있는 경우 (목차 번호, 참조 번호 등)
+                                if (/^\d+$/.test(text)) {
+                                    console.warn(`[CopyClean] 페이지 ${pageNum}: 원문이 숫자뿐인 카드 제외 — "${text}"`);
+                                    return false;
+                                }
+                                // 원문이 2글자 이하인 경우 (의미 있는 문장이 아님)
+                                if (text.length <= 2) {
+                                    console.warn(`[CopyClean] 페이지 ${pageNum}: 원문이 너무 짧은 카드 제외 — "${text}"`);
+                                    return false;
+                                }
+                                return true;
+                            });
+                            if (beforeCount !== parsed.comparisons.length) {
+                                console.log(`[CopyClean] 페이지 ${pageNum}: 무의미한 카드 ${beforeCount - parsed.comparisons.length}개 필터링됨`);
+                            }
                             parsed.comparisons = parsed.comparisons.map(comp => {
                                 // 비교 카드가 존재하는데 similarity가 0이면 데이터 추출 오류로 간주
                                 if (comp.similarity === 0 && (comp.originalText || comp.highlightedText)) {
